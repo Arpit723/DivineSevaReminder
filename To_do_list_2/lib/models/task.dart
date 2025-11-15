@@ -4,7 +4,8 @@ enum TaskCategory {
   food('Food'),
   bills('Bills'),
   bigExpenditure('Big expenditure'),
-  medicines('Medicines');
+  medicines('Medicines'),
+  centerSeva('Center Seva');
 
   const TaskCategory(this.name);
   final String name;
@@ -103,6 +104,8 @@ class Task {
         return TaskCategory.bigExpenditure;
       case 'medicines':
         return TaskCategory.medicines;
+      case 'centerSeva':
+        return TaskCategory.centerSeva;
       default:
         return TaskCategory.transportation;
     }

@@ -45,17 +45,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     super.dispose();
   }
 
-  void _toggleEditMode() {
-    setState(() {
-      _isEditing = !_isEditing;
-      if (!_isEditing) {
-        // Reset controllers to original values if canceling edit
-        _titleController.text = widget.task.title;
-        _descriptionController.text = widget.task.description;
-      }
-    });
-  }
-
   bool _validateForm() {
     setState(() {
       _titleError = null;
@@ -83,7 +72,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       isValid = false;
     }
 
-    // Validate due date (if set, it should be in the future for new tasks)
+
+    if (widget.isNewTask && widget.task.dueDate == null) {
+      setState(() {
+        _dueDateError = 'Due date is required';
+      });
+      isValid = false;
+    }
+
+
+      // Validate due date (if set, it should be in the future for new tasks)
     if (widget.isNewTask && widget.task.dueDate != null) {
       final now = DateTime.now();
       if (widget.task.dueDate!.isBefore(now)) {
@@ -227,7 +225,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isNewTask 
-            ? 'Create New Task' 
+            ? 'Create New Seva'
             : (_isEditing ? 'Edit Task' : 'Task Details')),
         actions: [
           if (widget.isNewTask) ...[
@@ -256,8 +254,195 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            // Task Status Card
-            Card(
+              //1. Task Title Section
+              const SizedBox(height: 12),
+              const Text(
+                'Task Title',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B0000),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: 'Enter task title...',
+                  errorText: _titleError,
+                  errorStyle: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 17,
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 17,
+                  color: Colors.black,
+                ),
+                onChanged: (value) {
+                  if (_titleError != null) {
+                    setState(() {
+                      _titleError = null;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 18),
+
+              //2. Category Selection Section
+              const Text(
+                'Category',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B0000),
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<TaskCategory>(
+                value: widget.task.category,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
+                selectedItemBuilder: (BuildContext context) {
+                  return TaskCategory.values.map((category) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getCategoryIcon(category),
+                          color: Colors.blue,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          category.name,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList();
+                },
+                items: TaskCategory.values.map((category) {
+                  return DropdownMenuItem<TaskCategory>(
+                    value: category,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getCategoryIcon(category),
+                          color: Colors.blue,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          category.name,
+                          style: const TextStyle(fontSize: 17),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (TaskCategory? newCategory) {
+                  if (newCategory != null) {
+                    setState(() {
+                      widget.task.category = newCategory;
+                    });
+
+                    // Auto-save the category change
+                    if (!widget.isNewTask) {
+                      widget.onEditTask(widget.task.id, widget.task.title);
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 18),
+
+              //3.  Due Date Section
+              const Text(
+                'Due Date',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B0000),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          color: widget.task.isOverdue ? Colors.red : Colors.grey[600],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.task.dueDateDisplay,
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: widget.task.isOverdue ? Colors.red : Colors.black,
+                              fontWeight: widget.task.isOverdue ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: _selectDueDate,
+                          tooltip: 'Set due date',
+                        ),
+                        if (widget.task.dueDate != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: _clearDueDate,
+                            tooltip: 'Clear due date',
+                          ),
+                      ],
+                    ),
+                    if (widget.task.isOverdue)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'This task is overdue!',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    if (_dueDateError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _dueDateError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              //4. Task Status Card
+              Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -266,8 +451,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     const Text(
                       'Status',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF8B0000),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -297,7 +483,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               Text(
                                 status.name,
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 17,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                   color: isSelected ? const Color(0xFF8B0000) : Colors.black,
                                 ),
@@ -311,221 +497,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Task Title Section
-            const Text(
-              'Task Title',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B0000),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                hintText: 'Enter task title...',
-                errorText: _titleError,
-                errorStyle: const TextStyle(color: Colors.red),
-              ),
-              style: TextStyle(
-                decoration: widget.task.isCompleted 
-                    ? TextDecoration.lineThrough 
-                    : TextDecoration.none,
-                color: widget.task.isCompleted 
-                    ? Colors.grey 
-                    : Colors.black,
-              ),
-              onChanged: (value) {
-                if (_titleError != null) {
-                  setState(() {
-                    _titleError = null;
-                  });
-                }
-              },
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Task Description Section
-            const Text(
-              'Description',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B0000),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Enter task description (optional)...',
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Due Date Section
-            const Text(
-              'Due Date',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B0000),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        color: widget.task.isOverdue ? Colors.red : Colors.grey[600],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.task.dueDateDisplay,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: widget.task.isOverdue ? Colors.red : Colors.black,
-                            fontWeight: widget.task.isOverdue ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: _selectDueDate,
-                        tooltip: 'Set due date',
-                      ),
-                      if (widget.task.dueDate != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          onPressed: _clearDueDate,
-                          tooltip: 'Clear due date',
-                        ),
-                    ],
-                  ),
-                  if (widget.task.isOverdue)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'This task is overdue!',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (_dueDateError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _dueDateError!,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Category Selection Section
-            const Text(
-              'Category',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<TaskCategory>(
-              value: widget.task.category,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
-              items: TaskCategory.values.map((category) {
-                return DropdownMenuItem<TaskCategory>(
-                  value: category,
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getCategoryIcon(category),
-                        color: Colors.blue,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(category.name),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (TaskCategory? newCategory) {
-                if (newCategory != null) {
-                  setState(() {
-                    widget.task.category = newCategory;
-                  });
-                  
-                  // Auto-save the category change
-                  if (!widget.isNewTask) {
-                    widget.onEditTask(widget.task.id, widget.task.title);
-                  }
-                }
-              },
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Task Details Section
-            const Text(
-              'Task Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
+            const SizedBox(height: 18),
             // Created Date
             _buildDetailRow(
               icon: Icons.schedule,
-              label: 'Created',
+              label: 'Created On',
               value: _formatDateTime(widget.task.createdAt),
             ),
-            
-            const SizedBox(height: 8),
-            
-            // Task ID
-            _buildDetailRow(
-              icon: Icons.fingerprint,
-              label: 'Task ID',
-              value: widget.task.id,
-            ),
-            
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             ],
           ),
         ),
@@ -548,15 +527,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+                fontSize: 17,
+                color: Color(0xFF8B0000),
                 fontWeight: FontWeight.w500,
               ),
             ),
             SelectableText(
               value,
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -567,7 +546,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    //at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')
   }
 
   IconData _getCategoryIcon(TaskCategory category) {
@@ -582,6 +562,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         return Icons.attach_money;
       case TaskCategory.medicines:
         return Icons.medical_services;
+      case TaskCategory.centerSeva:
+        return Icons.business;
     }
   }
 }
