@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/custom_category.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
+import '../services/category_storage_service.dart';
 import 'task_detail_screen.dart';
 
 class TodoListScreen extends StatefulWidget {
@@ -13,13 +15,21 @@ class TodoListScreen extends StatefulWidget {
 
 class _TodoListScreenState extends State<TodoListScreen> {
   List<Task> tasks = [];
+  Map<String, CustomCategory> _customCategoriesMap = {};
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
-
+    _loadCustomCategories();
     checkNotificationPermissions();
+  }
+
+  Future<void> _loadCustomCategories() async {
+    final categories = await CategoryStorageService.getAllCategories();
+    setState(() {
+      _customCategoriesMap = {for (var cat in categories) cat.id: cat};
+    });
   }
 
   void checkNotificationPermissions() async {
@@ -176,7 +186,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service List'),
+        title: const Text('Seva List'),
       ),
       body: tasks.isEmpty
           ? const Center(
@@ -283,7 +293,13 @@ class _TodoListScreenState extends State<TodoListScreen> {
               child: ListTile(
                 leading: task.isOverdue && !task.isCompleted
                     ? const Icon(Icons.warning, color: Colors.red, size: 24)
-                    : Icon(_getCategoryIcon(task.category), color: const Color(0xFF8B0000), size: 24),
+                    : Icon(
+                        task.customCategoryId != null
+                            ? Icons.label
+                            : _getCategoryIcon(task.category),
+                        color: const Color(0xFF8B0000),
+                        size: 24,
+                      ),
                 title: Text(
                   task.title,
                   style: TextStyle(
@@ -298,8 +314,54 @@ class _TodoListScreenState extends State<TodoListScreen> {
                         : FontWeight.normal,
                   ),
                 ),
-                subtitle: task.dueDate != null
-                    ? Row(
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    // Category name
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.category,
+                          size: 12,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          task.customCategoryId != null
+                              ? (_customCategoriesMap[task.customCategoryId]?.name ?? 'Unknown')
+                              : task.category.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Status
+                    Row(
+                      children: [
+                        Icon(
+                          _getStatusIcon(task.status),
+                          size: 12,
+                          color: _getStatusColor(task.status),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          task.status.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _getStatusColor(task.status),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Due date (if exists)
+                    if (task.dueDate != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
                         children: [
                           Icon(
                             Icons.schedule,
@@ -316,8 +378,10 @@ class _TodoListScreenState extends State<TodoListScreen> {
                             ),
                           ),
                         ],
-                      )
-                    : null,
+                      ),
+                    ],
+                  ],
+                ),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -365,6 +429,28 @@ class _TodoListScreenState extends State<TodoListScreen> {
         return Icons.medical_services;
       case TaskCategory.centerSeva:
         return Icons.home_repair_service;
+    }
+  }
+
+  IconData _getStatusIcon(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.assigned:
+        return Icons.assignment;
+      case TaskStatus.started:
+        return Icons.play_circle_outline;
+      case TaskStatus.completed:
+        return Icons.check_circle;
+    }
+  }
+
+  Color _getStatusColor(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.assigned:
+        return Colors.grey;
+      case TaskStatus.started:
+        return Colors.blue;
+      case TaskStatus.completed:
+        return Colors.green;
     }
   }
 }

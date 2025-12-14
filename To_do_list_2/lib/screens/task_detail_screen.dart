@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/custom_category.dart';
 import '../services/notification_service.dart';
+import '../services/category_storage_service.dart';
+import 'category_list_screen.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -28,6 +31,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _isEditing = false;
   String? _titleError;
   String? _dueDateError;
+  CustomCategory? _selectedCustomCategory;
 
   @override
   void initState() {
@@ -36,6 +40,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     _descriptionController = TextEditingController(text: widget.task.description);
     // Start in editing mode for new tasks
     _isEditing = widget.isNewTask;
+    _loadSelectedCustomCategory();
+  }
+
+  Future<void> _loadSelectedCustomCategory() async {
+    if (widget.task.customCategoryId != null) {
+      final customCategory = await CategoryStorageService.getCategoryById(widget.task.customCategoryId!);
+      if (customCategory != null) {
+        setState(() {
+          _selectedCustomCategory = customCategory;
+        });
+      }
+    }
   }
 
   @override
@@ -226,7 +242,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       appBar: AppBar(
         title: Text(widget.isNewTask 
             ? 'Create New Seva'
-            : (_isEditing ? 'Edit Task' : 'Task Details')),
+            : (_isEditing ? 'Edit Seva' : 'Seva Details')),
         actions: [
           if (widget.isNewTask) ...[
             IconButton(
@@ -267,6 +283,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _titleController,
+                maxLines: 4,
+                minLines: 1,
+                keyboardType: TextInputType.multiline,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   hintText: 'Enter task title...',
@@ -276,7 +295,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     fontSize: 17,
                   ),
                 ),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 17,
                   color: Colors.black,
                 ),
@@ -300,64 +319,81 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<TaskCategory>(
-                value: widget.task.category,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+              // Display selected category
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                selectedItemBuilder: (BuildContext context) {
-                  return TaskCategory.values.map((category) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getCategoryIcon(category),
-                          color: Colors.blue,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          category.name,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList();
-                },
-                items: TaskCategory.values.map((category) {
-                  return DropdownMenuItem<TaskCategory>(
-                    value: category,
-                    child: Row(
-                      children: [
-                        Icon(
-                          _getCategoryIcon(category),
-                          color: Colors.blue,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          category.name,
-                          style: const TextStyle(fontSize: 17),
-                        ),
-                      ],
+                child: Row(
+                  children: [
+                    Icon(
+                      _selectedCustomCategory != null
+                          ? Icons.label
+                          : _getCategoryIcon(widget.task.category),
+                      color: const Color(0xFF8B0000),
+                      size: 24,
                     ),
-                  );
-                }).toList(),
-                onChanged: (TaskCategory? newCategory) {
-                  if (newCategory != null) {
-                    setState(() {
-                      widget.task.category = newCategory;
-                    });
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _selectedCustomCategory?.name ?? widget.task.category.name,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CategoryListScreen(
+                              selectedCategory: widget.task.customCategoryId == null
+                                  ? widget.task.category
+                                  : null,
+                              selectedCustomCategoryId: widget.task.customCategoryId,
+                              onCategorySelected: (TaskCategory newCategory) {
+                                setState(() {
+                                  widget.task.category = newCategory;
+                                  widget.task.customCategoryId = null;
+                                  _selectedCustomCategory = null;
+                                });
 
-                    // Auto-save the category change
-                    if (!widget.isNewTask) {
-                      widget.onEditTask(widget.task.id, widget.task.title);
-                    }
-                  }
-                },
+                                // Auto-save the category change
+                                if (!widget.isNewTask) {
+                                  widget.onEditTask(widget.task.id, widget.task.title);
+                                }
+                              },
+                              onCustomCategorySelected: (String customCategoryId) async {
+                                final customCategory = await CategoryStorageService.getCategoryById(customCategoryId);
+                                if (customCategory != null) {
+                                  setState(() {
+                                    widget.task.customCategoryId = customCategoryId;
+                                    _selectedCustomCategory = customCategory;
+                                  });
+
+                                  // Auto-save the category change
+                                  if (!widget.isNewTask) {
+                                    widget.onEditTask(widget.task.id, widget.task.title);
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ).then((_) {
+                          // Reload custom category after returning
+                          _loadSelectedCustomCategory();
+                        });
+                      },
+                      tooltip: 'Change category',
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
 
@@ -441,9 +477,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
               const SizedBox(height: 18),
 
-              //4. Task Status Card
-              Card(
-              child: Padding(
+              //4. Task Status Section
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,8 +512,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                isSelected 
-                                    ? Icons.radio_button_checked 
+                                isSelected
+                                    ? Icons.radio_button_checked
                                     : Icons.radio_button_unchecked,
                                 color: isSelected ? const Color(0xFF8B0000) : Colors.grey,
                                 size: 24,
@@ -496,7 +535,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ],
                 ),
               ),
-            ),
             const SizedBox(height: 18),
             // Created Date
             _buildDetailRow(

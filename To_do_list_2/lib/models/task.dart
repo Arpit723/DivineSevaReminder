@@ -27,7 +27,8 @@ class Task {
   TaskStatus status; // Task status (Assigned, Started, Completed)
   DateTime createdAt; // When the task was created
   DateTime? dueDate; // Optional due date and time
-  TaskCategory category; // Task category
+  TaskCategory category; // Task category (built-in)
+  String? customCategoryId; // Custom category ID (if using custom category)
 
   Task({
     required this.id,
@@ -37,6 +38,7 @@ class Task {
     required this.createdAt,
     this.dueDate,
     this.category = TaskCategory.transportation,
+    this.customCategoryId,
   });
 
   // Convert Task to JSON for storage
@@ -49,6 +51,7 @@ class Task {
       'createdAt': createdAt.toIso8601String(),
       'dueDate': dueDate?.toIso8601String(),
       'category': category.name,
+      'customCategoryId': customCategoryId,
     };
   }
 
@@ -62,6 +65,7 @@ class Task {
       createdAt: DateTime.parse(json['createdAt']),
       dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
       category: _parseCategory(json['category']),
+      customCategoryId: json['customCategoryId'],
     );
   }
 
