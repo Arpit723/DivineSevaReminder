@@ -15,13 +15,13 @@ class NotificationService {
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    // iOS notification settings
+    // iOS notification settings - Don't request permissions yet
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-      requestCriticalPermission: true,
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+      requestCriticalPermission: false,
     );
 
     // Combined initialization settings
@@ -36,14 +36,15 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
-    // Request permissions for notifications
-    await _requestPermissions();
-    
+    // Don't request permissions automatically - let user do it via the permission screen
+    // await _requestPermissions();
+
     // Create notification channels for Android
     await _createNotificationChannels();
   }
 
-  static Future<void> _requestPermissions() async {
+  // Public method to request permissions - called when user taps "Allow" button
+  static Future<void> requestPermissions() async {
     // Request permission on iOS
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -81,11 +82,21 @@ class NotificationService {
       enableVibration: true,
     );
 
+    const AndroidNotificationChannel dailyReminderChannel = AndroidNotificationChannel(
+      'daily_reminder_channel',
+      'Daily Morning Reminders',
+      description: 'Daily 9 AM reminders for tasks due today',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    
+
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(dueDateChannel);
       await androidPlugin.createNotificationChannel(reminderChannel);
+      await androidPlugin.createNotificationChannel(dailyReminderChannel);
     }
   }
 
@@ -233,6 +244,98 @@ class NotificationService {
     await _notifications.cancelAll();
   }
 
+  // Schedule daily 9 AM reminder for tasks due today or overdue
+  static Future<void> scheduleDailyMorningReminder(List<Task> allTasks) async {
+    // Cancel existing daily reminder first
+    await _notifications.cancel(999999); // Using a fixed ID for daily reminder
+
+    // Calculate next 9 AM
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      9, // 9 AM
+      0, // 0 minutes
+    );
+
+    // If it's already past 9 AM today, schedule for tomorrow
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    // Filter tasks that are due today or overdue (and not completed)
+    final dueTasks = allTasks.where((task) {
+      if (task.dueDate == null || task.status == TaskStatus.completed) {
+        return false;
+      }
+
+      final dueDate = task.dueDate!;
+      final today = DateTime.now();
+
+      // Check if task is due today or overdue
+      return dueDate.year <= today.year &&
+          dueDate.month <= today.month &&
+          dueDate.day <= today.day;
+    }).toList();
+
+    // Only schedule if there are tasks due
+    if (dueTasks.isEmpty) {
+      print('No tasks due today or overdue, skipping daily reminder');
+      return;
+    }
+
+    // Create notification message
+    String body;
+    if (dueTasks.length == 1) {
+      body = 'You have 1 task due: ${dueTasks.first.title}';
+    } else {
+      body = 'You have ${dueTasks.length} tasks due today';
+    }
+
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'daily_reminder_channel',
+      'Daily Morning Reminders',
+      channelDescription: 'Daily 9 AM reminders for tasks due today',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      enableLights: true,
+      enableVibration: true,
+    );
+
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    print('Scheduling daily morning reminder for ${scheduledDate.toString()}');
+
+    await _notifications.zonedSchedule(
+      999999, // Fixed ID for daily reminder
+      'Good Morning! 🌅',
+      body,
+      scheduledDate,
+      notificationDetails,
+      payload: 'daily_reminder',
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time, // Repeat daily at 9 AM
+    );
+  }
+
+  // Cancel daily morning reminder
+  static Future<void> cancelDailyMorningReminder() async {
+    await _notifications.cancel(999999);
+  }
+
   // Get pending notifications (for debugging)
   static Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     final pending = await _notifications.pendingNotificationRequests();
@@ -307,16 +410,43 @@ class NotificationService {
     }
   }
 
+  // Check notification permission status without requesting
+  static Future<bool> checkPermissionStatus() async {
+    print('Checking notification permission status...');
+
+    // Check Android permissions
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      final areEnabled = await androidPlugin.areNotificationsEnabled();
+      print('Android notifications enabled: $areEnabled');
+      return areEnabled ?? false;
+    }
+
+    // For iOS, we need to check permission status
+    // Note: iOS doesn't provide a direct way to check without requesting
+    // The permission status is implicit - if notifications were denied,
+    // they won't show up. We assume granted for now.
+    final iosPlugin = _notifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    if (iosPlugin != null) {
+      print('iOS platform detected - permission status check not directly available');
+      // iOS doesn't expose permission status check in flutter_local_notifications
+      // Return true optimistically, or implement platform channel for detailed check
+      return true;
+    }
+
+    return false;
+  }
+
   // Check and request notification permissions
   static Future<bool> checkAndRequestPermissions() async {
     print('Checking notification permissions...');
-    
+
     // Check Android permissions
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       final areEnabled = await androidPlugin.areNotificationsEnabled();
       print('Android notifications currently enabled: $areEnabled');
-      
+
       if (areEnabled == false) {
         // Request permission
         final granted = await androidPlugin.requestNotificationsPermission();
@@ -326,7 +456,7 @@ class NotificationService {
       return areEnabled ?? false;
     }
 
-    // Check iOS permissions  
+    // Check iOS permissions
     final iosPlugin = _notifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     if (iosPlugin != null) {
       final granted = await iosPlugin.requestPermissions(
@@ -338,7 +468,7 @@ class NotificationService {
       print('iOS notification permissions granted: $granted');
       return granted ?? false;
     }
-    
+
     return false;
   }
 

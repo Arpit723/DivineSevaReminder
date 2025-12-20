@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../services/category_storage_service.dart';
 import 'task_detail_screen.dart';
+import 'settings_screen.dart';
 
 class TodoListScreen extends StatefulWidget {
   const TodoListScreen({super.key});
@@ -48,6 +49,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
     setState(() {
       tasks = loadedTasks;
     });
+
+    // Schedule daily 9 AM reminder for tasks due today
+    await NotificationService.scheduleDailyMorningReminder(tasks);
   }
 
   // Save tasks to storage whenever tasks change
@@ -81,7 +85,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
     );
   }
 
-  void _addTask(String taskId, String title) {
+  void _addTask(String taskId, String title) async {
     // Find the existing temporary task to get all its fields
     final tempTaskIndex = tasks.indexWhere((task) => task.id == taskId);
     Task newTask;
@@ -123,10 +127,13 @@ class _TodoListScreenState extends State<TodoListScreen> {
       NotificationService.scheduleTaskNotifications(newTask);
     }
 
+    // Update daily 9 AM reminder with all tasks
+    await NotificationService.scheduleDailyMorningReminder(tasks);
+
     _saveTasks(); // Save after adding task
   }
 
-  void _toggleTaskStatus(String taskId) {
+  void _toggleTaskStatus(String taskId) async {
     setState(() {
       // Find the task with this ID and cycle through statuses
       for (var task in tasks) {
@@ -146,10 +153,14 @@ class _TodoListScreenState extends State<TodoListScreen> {
         }
       }
     });
+
+    // Update daily 9 AM reminder (in case task was marked completed)
+    await NotificationService.scheduleDailyMorningReminder(tasks);
+
     _saveTasks(); // Save after status change
   }
 
-  void _editTask(String taskId, String newTitle) {
+  void _editTask(String taskId, String newTitle) async {
     Task? updatedTask;
     setState(() {
       for (var task in tasks) {
@@ -166,10 +177,13 @@ class _TodoListScreenState extends State<TodoListScreen> {
       NotificationService.scheduleTaskNotifications(updatedTask!);
     }
 
+    // Update daily 9 AM reminder
+    await NotificationService.scheduleDailyMorningReminder(tasks);
+
     _saveTasks(); // Save after editing task
   }
 
-  void _deleteTask(String taskId) {
+  void _deleteTask(String taskId) async {
     // Find the task before deleting to cancel its notifications
     final taskToDelete = tasks.firstWhere((task) => task.id == taskId);
 
@@ -179,6 +193,10 @@ class _TodoListScreenState extends State<TodoListScreen> {
     setState(() {
       tasks.removeWhere((task) => task.id == taskId);
     });
+
+    // Update daily 9 AM reminder
+    await NotificationService.scheduleDailyMorningReminder(tasks);
+
     _saveTasks(); // Save after deleting task
   }
 
@@ -187,6 +205,20 @@ class _TodoListScreenState extends State<TodoListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Seva List'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Settings',
+          ),
+        ],
       ),
       body: tasks.isEmpty
           ? const Center(

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/notification_service.dart';
 import 'screens/task_list_screen.dart';
+import 'screens/notification_permission_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize notification service
   await NotificationService.initialize();
-  
+
   runApp(const TodoApp());
 }
 
@@ -44,7 +46,97 @@ class TodoApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      home: const TodoListScreen(),
+      home: const SplashScreen(),
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissionStatus();
+  }
+
+  Future<void> _checkPermissionStatus() async {
+    // Check if permission has been requested before
+    final prefs = await SharedPreferences.getInstance();
+    final permissionRequested = prefs.getBool('notification_permission_requested') ?? false;
+
+    // Wait a brief moment for splash effect
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    if (permissionRequested) {
+      // Permission already handled, go to main screen
+      _navigateToMainScreen();
+    } else {
+      // First time, show permission screen
+      _navigateToPermissionScreen();
+    }
+  }
+
+  void _navigateToMainScreen() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const TodoListScreen(),
+      ),
+    );
+  }
+
+  void _navigateToPermissionScreen() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => NotificationPermissionScreen(
+          onPermissionGranted: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const TodoListScreen(),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF8B0000),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 100,
+              color: Colors.white,
+            ),
+            SizedBox(height: 24),
+            Text(
+              'Divine To-Do List',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 16),
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
