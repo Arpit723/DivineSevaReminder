@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/notification_service.dart';
 import 'screens/task_list_screen.dart';
 import 'screens/notification_permission_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,8 +67,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkPermissionStatus() async {
-    // Check if permission has been requested before
+    // Check if user is logged in
     final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
     final permissionRequested = prefs.getBool('notification_permission_requested') ?? false;
 
     // Wait a brief moment for splash effect
@@ -75,13 +77,59 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    if (permissionRequested) {
-      // Permission already handled, go to main screen
+    if (!isLoggedIn) {
+      // Not logged in, show login screen
+      _navigateToLoginScreen();
+    } else if (permissionRequested) {
+      // Logged in and permission already handled, go to main screen
       _navigateToMainScreen();
     } else {
-      // First time, show permission screen
+      // Logged in but first time, show permission screen
       _navigateToPermissionScreen();
     }
+  }
+
+  void _navigateToLoginScreen() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => LoginScreen(
+          onLoginSuccess: () async {
+            // Save login status
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('is_logged_in', true);
+
+            // Check if permission was requested
+            final permissionRequested = prefs.getBool('notification_permission_requested') ?? false;
+
+            if (!mounted) return;
+
+            if (permissionRequested) {
+              // Permission already handled, go to main screen
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const TodoListScreen(),
+                ),
+              );
+            } else {
+              // First time, show permission screen
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => NotificationPermissionScreen(
+                    onPermissionGranted: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => const TodoListScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void _navigateToMainScreen() {
