@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../presentation/providers/auth_providers.dart';
+// import 'email_verification_screen.dart'; // Commented: Email verification feature disabled
 
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
   final VoidCallback onSignUpSuccess;
 
   const SignUpScreen({
@@ -10,10 +13,10 @@ class SignUpScreen extends StatefulWidget {
   });
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -44,11 +47,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return 'Name must be at least 3 characters';
     }
 
-    // Check if name contains at least one space (first and last name)
-    if (!value.trim().contains(' ')) {
-      return 'Please enter first and last name';
-    }
-
     return null;
   }
 
@@ -69,7 +67,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
+    // Phone number is required
+    if (value == null || value.trim().isEmpty) {
       return 'Please enter phone number';
     }
 
@@ -97,18 +96,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     // Check for at least one uppercase letter
-    if (!value.contains(RegExp(r'[A-Z]'))) {
-      return 'Password must contain at least one uppercase letter';
-    }
+    // if (!value.contains(RegExp(r'[A-Z]'))) {
+    //   return 'Password must contain at least one uppercase letter (A-Z)';
+    // }
 
     // Check for at least one lowercase letter
-    if (!value.contains(RegExp(r'[a-z]'))) {
-      return 'Password must contain at least one lowercase letter';
-    }
+    // if (!value.contains(RegExp(r'[a-z]'))) {
+    //   return 'Password must contain at least one lowercase letter (a-z)';
+    // }
 
     // Check for at least one number
     if (!value.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one number';
+      return 'Password must contain at least one number (0-9)';
+    }
+
+    // Check for at least one special character
+    if (!value.contains(RegExp(r'[!@#$%^&*]'))) {
+      return 'Password must contain at least one special character (!@#\$%^&*...)';
     }
 
     return null;
@@ -136,25 +140,177 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _isLoading = true;
     });
 
-    // Simulate sign up API call
-    await Future.delayed(const Duration(seconds: 2));
+    // Get auth repository from provider
+    final authRepository = ref.read(authRepositoryProvider);
+
+    // Call Firebase auth
+    final result = await authRepository.signUpWithEmail(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      fullName: _fullNameController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
+    );
 
     setState(() {
       _isLoading = false;
     });
 
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    // Handle result
+    if (!mounted) return;
 
-      // Navigate back or to main screen
-      widget.onSignUpSuccess();
-    }
+    result.fold(
+      (failure) {
+        // Extract error message from Failure using when
+        final errorMessage = failure.when(
+          generic: (msg) => msg,
+          network: (msg) => msg,
+          database: (msg) => msg,
+          auth: (msg) => msg,
+          validation: (msg) => msg,
+          notFound: (msg) => msg ?? 'Not found',
+          permissionDenied: (msg) => msg,
+          cache: (msg) => msg,
+          sync: (msg) => msg,
+          unknown: (error, stackTrace) => 'An unexpected error occurred',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (user) async {
+        // Email verification feature commented out - directly call success callback
+        // TODO: Uncomment below code to enable email verification
+        /*
+        // Send verification email
+        final authRepository = ref.read(authRepositoryProvider);
+        final verifyResult = await authRepository.sendEmailVerification();
+
+        if (!mounted) return;
+
+        verifyResult.fold(
+          (failure) {
+            // Email verification failed, but account was created
+            // Show the actual error for debugging
+            final errorMessage = failure.when(
+              generic: (msg) => msg,
+              network: (msg) => msg,
+              database: (msg) => msg,
+              auth: (msg) => msg,
+              validation: (msg) => msg,
+              notFound: (msg) => msg ?? 'Not found',
+              permissionDenied: (msg) => msg,
+              cache: (msg) => msg,
+              sync: (msg) => msg,
+              unknown: (error, stackTrace) => 'Error: $error',
+            );
+
+            // Show error with details
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Verification email error: $errorMessage'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          },
+          (_) {
+            // Email sent successfully - show confirmation
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Verification email sent! Please check your inbox.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          },
+        );
+
+        // Navigate to email verification screen regardless
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationScreen(
+              onVerificationSuccess: () {
+                Navigator.of(context).pop(); // Close verification screen
+                widget.onSignUpSuccess(); // Call success callback
+              },
+            ),
+          ),
+        );
+        */
+
+        // Direct success - no email verification required
+        // Show success dialog
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+        });
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                // Container(
+                //   width: 48,
+                //   height: 48,
+                //   decoration: const BoxDecoration(
+                //     color: Colors.green,
+                //     shape: BoxShape.circle,
+                //   ),
+                //   child: const Icon(
+                //     Icons.check_rounded,
+                //     color: Colors.white,
+                //     size: 28,
+                //   ),
+                // ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Text(
+                    'Welcome Aboard!',
+                    style: TextStyle(
+                      color: Color(0xFF8B0000),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Your account has been created successfully! You can now login with your credentials to access the app.',
+              style: TextStyle(fontSize: 16, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to login screen
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Go to Login',
+                  style: TextStyle(
+                    color: Color(0xFF8B0000),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -332,6 +488,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       labelText: 'Password',
                       hintText: 'Enter your password',
                       prefixIcon: const Icon(Icons.lock_outline),
+                      helperText: 'Min 8 chars, 1 number (0-9), 1 special character',
+                      helperStyle: const TextStyle(fontSize: 11, color: Colors.grey),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isPasswordVisible

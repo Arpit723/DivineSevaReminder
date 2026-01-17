@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'signup_screen.dart';
+import '../presentation/providers/auth_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback onLoginSuccess;
 
   const LoginScreen({
@@ -10,10 +13,10 @@ class LoginScreen extends StatefulWidget {
   });
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -66,25 +69,58 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // Simulate login API call
-    await Future.delayed(const Duration(seconds: 1));
+    // Get auth repository from provider
+    final authRepository = ref.read(authRepositoryProvider);
+
+    // Call Firebase auth
+    final result = await authRepository.signInWithEmail(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
     setState(() {
       _isLoading = false;
     });
 
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+    // Handle result
+    if (!mounted) return;
 
-      // Navigate to main screen
-      widget.onLoginSuccess();
-    }
+    result.fold(
+      (failure) {
+        // Extract error message from Failure using when
+        final errorMessage = failure.when(
+          generic: (msg) => msg,
+          network: (msg) => msg,
+          database: (msg) => msg,
+          auth: (msg) => msg,
+          validation: (msg) => msg,
+          notFound: (msg) => msg ?? 'Not found',
+          permissionDenied: (msg) => msg,
+          cache: (msg) => msg,
+          sync: (msg) => msg,
+          unknown: (error, stackTrace) => 'An unexpected error occurred',
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+      (user) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to main task screen
+        context.go('/');
+      },
+    );
   }
 
   @override

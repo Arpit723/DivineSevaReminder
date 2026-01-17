@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "428678175498",
+    "project_id": "devinetodolist",
+    "storage_bucket": "devinetodolist.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:428678175498:android:3a2be2b0eb7f2f80ccf8f3",
+        "android_client_info": {
+          "package_name": "com.bk.divinesevalist"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "428678175498-9fikpk32bhvhd4jlpjslb2esbh1895vu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCx3t3vsmjjMyMJl94ZIqrGYTPJZ3_Nddw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "428678175498-9fikpk32bhvhd4jlpjslb2esbh1895vu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

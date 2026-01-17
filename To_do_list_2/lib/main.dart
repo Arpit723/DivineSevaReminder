@@ -1,26 +1,105 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/notification_service.dart';
-import 'screens/task_list_screen.dart';
-import 'screens/notification_permission_screen.dart';
-import 'screens/login_screen.dart';
+import 'presentation/navigation/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase (optional - will fail gracefully if not configured)
+  bool firebaseInitialized = false;
+  try {
+    await Firebase.initializeApp();
+    firebaseInitialized = true;
+    print('Firebase initialized successfully');
+  } catch (e) {
+    // Firebase not configured, continue without it
+    print('Firebase not initialized: $e');
+    print('App will continue without Firebase features');
+  }
+
   // Initialize notification service
   await NotificationService.initialize();
 
-  runApp(const TodoApp());
+  runApp(
+    const ProviderScope(
+      child: TodoApp(),
+    ),
+  );
 }
 
-class TodoApp extends StatelessWidget {
+class TodoApp extends ConsumerStatefulWidget {
   const TodoApp({super.key});
 
   @override
+  ConsumerState<TodoApp> createState() => _TodoAppState();
+}
+
+class _TodoAppState extends ConsumerState<TodoApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Email verification feature commented out
+    /*
+    if (state == AppLifecycleState.resumed) {
+      // Check email verification when app resumes
+      _checkEmailVerification();
+    }
+    */
+  }
+
+  // Email verification feature commented out
+  /*
+  Future<void> _checkEmailVerification() async {
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+      final userResult = await authRepository.getCurrentUser();
+
+      userResult.fold(
+        (failure) => null,
+        (user) {
+          if (user != null && !user.emailVerified) {
+            // User is logged in but email not verified
+            // Check if verification status has changed
+            authRepository.checkEmailVerification().then((result) {
+              result.fold(
+                (failure) => null,
+                (isVerified) {
+                  if (isVerified) {
+                    // Email was verified, refresh the auth state
+                    ref.invalidate(getCurrentUserProvider);
+                  }
+                },
+              );
+            });
+          }
+        },
+      );
+    } catch (e) {
+      // Silently fail on lifecycle check
+    }
+  }
+  */
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final router = ref.watch(goRouterProvider);
+
+    return MaterialApp.router(
       title: 'Divine To Do List',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.red,
         colorScheme: ColorScheme.fromSeed(
@@ -47,144 +126,7 @@ class TodoApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      home: const SplashScreen(),
-    );
-  }
-}
-
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _checkPermissionStatus();
-  }
-
-  Future<void> _checkPermissionStatus() async {
-    // Check if user is logged in
-    final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-    final permissionRequested = prefs.getBool('notification_permission_requested') ?? false;
-
-    // Wait a brief moment for splash effect
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (!mounted) return;
-
-    if (!isLoggedIn) {
-      // Not logged in, show login screen
-      _navigateToLoginScreen();
-    } else if (permissionRequested) {
-      // Logged in and permission already handled, go to main screen
-      _navigateToMainScreen();
-    } else {
-      // Logged in but first time, show permission screen
-      _navigateToPermissionScreen();
-    }
-  }
-
-  void _navigateToLoginScreen() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => LoginScreen(
-          onLoginSuccess: () async {
-            // Save login status
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('is_logged_in', true);
-
-            // Check if permission was requested
-            final permissionRequested = prefs.getBool('notification_permission_requested') ?? false;
-
-            if (!mounted) return;
-
-            if (permissionRequested) {
-              // Permission already handled, go to main screen
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const TodoListScreen(),
-                ),
-              );
-            } else {
-              // First time, show permission screen
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => NotificationPermissionScreen(
-                    onPermissionGranted: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (context) => const TodoListScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  void _navigateToMainScreen() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const TodoListScreen(),
-      ),
-    );
-  }
-
-  void _navigateToPermissionScreen() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => NotificationPermissionScreen(
-          onPermissionGranted: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const TodoListScreen(),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF8B0000),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 100,
-              color: Colors.white,
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Divine To-Do List',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            SizedBox(height: 16),
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ],
-        ),
-      ),
+      routerConfig: router,
     );
   }
 }

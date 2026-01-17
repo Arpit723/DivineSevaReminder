@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
-import 'login_screen.dart';
-import 'task_list_screen.dart';
+import '../presentation/providers/auth_providers.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _SettingsScreenContent(ref: ref);
+  }
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
+class _SettingsScreenContent extends StatefulWidget {
+  final WidgetRef ref;
+
+  const _SettingsScreenContent({required this.ref});
+
+  @override
+  State<_SettingsScreenContent> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBindingObserver {
   bool _notificationsEnabled = false;
   bool _isLoading = true;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -46,15 +59,15 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
     final enabled = await NotificationService.checkAndRequestPermissions();
 
-    setState(() {
-      _notificationsEnabled = enabled;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = enabled;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _showEnablePermissionDialog() async {
-    if (!mounted) return;
-
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -79,16 +92,13 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       ),
     );
 
-    if (result == true) {
+    if (result == true && mounted) {
       // Open app settings
-      // Permission will be automatically rechecked when app resumes
       await openAppSettings();
     }
   }
 
   Future<void> _showDisablePermissionDialog() async {
-    if (!mounted) return;
-
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -113,9 +123,8 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       ),
     );
 
-    if (result == true) {
+    if (result == true && mounted) {
       // Open app settings
-      // Permission will be automatically rechecked when app resumes
       await openAppSettings();
     }
   }
@@ -133,10 +142,12 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       // Check if granted
       final granted = await NotificationService.checkAndRequestPermissions();
 
-      setState(() {
-        _notificationsEnabled = granted;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = granted;
+          _isLoading = false;
+        });
+      }
 
       if (!granted && mounted) {
         // Permission denied - show alert with Settings option
@@ -166,42 +177,42 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               backgroundColor: const Color(0xFF8B0000),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Logout'),
+            child: _isLoggingOut
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text('Logout'),
           ),
         ],
       ),
     );
 
     if (result == true && mounted) {
-      // Clear login status
+      setState(() {
+        _isLoggingOut = true;
+      });
+
+      // Call Firebase signOut
+      final authRepository = widget.ref.read(authRepositoryProvider);
+      await authRepository.signOut();
+
+      // Clear only login-related preferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('is_logged_in', false);
+      await prefs.remove('is_logged_in');
 
-      if (!mounted) return;
+      if (mounted) {
+        setState(() {
+          _isLoggingOut = false;
+        });
 
-      // Navigate to login screen
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => LoginScreen(
-            onLoginSuccess: () async {
-              // Save login status
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('is_logged_in', true);
-
-              if (!mounted) return;
-
-              // Navigate to task list
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const TodoListScreen(),
-                ),
-                (route) => false,
-              );
-            },
-          ),
-        ),
-        (route) => false,
-      );
+        // Navigate to login screen using GoRouter
+        context.go('/auth/login');
+      }
     }
   }
 
