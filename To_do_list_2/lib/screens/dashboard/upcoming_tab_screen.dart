@@ -1,0 +1,590 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/task.dart';
+import '../../models/custom_category.dart';
+import '../../services/notification_service.dart';
+import '../../services/category_storage_service.dart';
+import '../../data/mappers/task_model_mapper.dart';
+import '../../domain/entities/task/todo_task.dart';
+import '../../domain/entities/task/task_status.dart' as domain_status;
+import '../task_detail_screen.dart';
+import '../../presentation/providers/calendar_providers.dart';
+import '../../presentation/providers/task_providers.dart';
+import '../../presentation/widgets/calendar/month_calendar_widget.dart';
+import '../../presentation/widgets/calendar/date_utils.dart' as app_date_utils;
+
+/// Upcoming tab screen - shows calendar and tasks grouped by date
+class UpcomingTabScreen extends ConsumerStatefulWidget {
+  const UpcomingTabScreen({super.key});
+
+  @override
+  ConsumerState<UpcomingTabScreen> createState() => _UpcomingTabScreenState();
+}
+
+class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
+  Map<String, CustomCategory> _customCategoriesMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomCategories();
+  }
+
+  Future<void> _loadCustomCategories() async {
+    final categories = await CategoryStorageService.getAllCategories();
+    if (mounted) {
+      setState(() {
+        _customCategoriesMap = {for (var cat in categories) cat.id: cat};
+      });
+    }
+  }
+
+  void _addTask(String taskId, String title) async {
+    final selectedDate = ref.read(calendarSelectedDateProvider);
+    // Set default time to 9:00 AM for better UX
+    final dueDateTime = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
+    final newTodoTask = TaskModelMapper.toTodoTask(Task(
+      id: taskId,
+      title: title,
+      description: '',
+      createdAt: DateTime.now(),
+      dueDate: dueDateTime,
+      category: TaskCategory.transportation,
+      status: TaskStatus.assigned,
+    ));
+
+    final repository = ref.read(taskRepositoryProvider);
+    final result = await repository.createTask(newTodoTask);
+
+    result.fold(
+      (failure) => _showErrorSnackBar('Failed to create seva: ${failure.toString()}'),
+      (createdTask) {
+        final legacyTask = TaskModelMapper.fromTodoTask(createdTask);
+        if (legacyTask.dueDate != null) {
+          NotificationService.scheduleTaskNotifications(legacyTask);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${createdTask.title} created')),
+        );
+      },
+    );
+  }
+
+  void _navigateToNewTask() {
+    final selectedDate = ref.read(calendarSelectedDateProvider);
+    // Set default time to 9:00 AM for better UX
+    final dueDateTime = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
+    final newTask = Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: '',
+      description: '',
+      createdAt: DateTime.now(),
+      dueDate: dueDateTime,
+      category: TaskCategory.transportation,
+      status: TaskStatus.assigned,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TaskDetailScreen(
+          task: newTask,
+          onEditTask: _addTask,
+          onDeleteTask: _deleteTask,
+          onToggleCompletion: _toggleTaskStatus,
+          isNewTask: true,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedDate = ref.watch(calendarSelectedDateProvider);
+    final tasksAsync = ref.watch(tasksForDateProvider(selectedDate));
+    final groupedTasksAsync = ref.watch(upcomingTasksGroupedProvider);
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToNewTask,
+        tooltip: 'Add Seva',
+        backgroundColor: const Color(0xFF8B0000),
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+        // Calendar (40% of screen)
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.4,
+          child: const MonthCalendarWidget(),
+        ),
+        const Divider(height: 1),
+        // Task list grouped by date (60% of screen)
+        Expanded(
+          child: groupedTasksAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading sevas: $error',
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            data: (groupedTasks) {
+              if (groupedTasks.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.event_available,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No upcoming sevas',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Your calendar is clear',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return _buildGroupedTaskList(groupedTasks, selectedDate);
+            },
+          ),
+        ),
+      ],
+      ),
+    );
+  }
+
+  Widget _buildGroupedTaskList(
+    Map<DateTime, List<TodoTask>> groupedTasks,
+    DateTime selectedDate,
+  ) {
+    // Sort the dates
+    final sortedDates = groupedTasks.keys.toList()..sort();
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: sortedDates.length,
+      itemBuilder: (context, index) {
+        final date = sortedDates[index];
+        final tasks = groupedTasks[date]!;
+        final taskList = tasks.map((t) => TaskModelMapper.fromTodoTask(t)).toList();
+        final isSelected = app_date_utils.DateUtils.isSameDay(date, selectedDate);
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ExpansionTile(
+            initiallyExpanded: isSelected,
+            leading: _buildDateIndicator(date),
+            title: Text(
+              app_date_utils.DateUtils.formatDateHeader(date),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? const Color(0xFF8B0000) : Colors.black87,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              '${taskList.length} seva${taskList.length > 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            trailing: Icon(
+              isSelected ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: const Color(0xFF8B0000),
+            ),
+            children: taskList.map((task) {
+              return _buildTaskListItem(task);
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDateIndicator(DateTime date) {
+    final now = DateTime.now();
+    final isToday = app_date_utils.DateUtils.isSameDay(date, now);
+    final isPast = app_date_utils.DateUtils.isInThePast(date);
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isToday
+            ? const Color(0xFF8B0000).withValues(alpha: 0.1)
+            : (isPast ? Colors.grey.withValues(alpha: 0.1) : null),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isToday
+              ? const Color(0xFF8B0000)
+              : (isPast ? Colors.grey : const Color(0xFF8B0000).withValues(alpha: 0.5)),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          '${date.day}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isToday
+                ? const Color(0xFF8B0000)
+                : (isPast ? Colors.grey : const Color(0xFF8B0000).withValues(alpha: 0.7)),
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskListItem(Task task) {
+    return Dismissible(
+      key: Key(task.id),
+      background: Container(
+        color: const Color(0xFF8B0000),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        child: const Row(
+          children: [
+            Icon(Icons.edit, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Edit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+      secondaryBackground: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            SizedBox(width: 8),
+            Icon(Icons.delete, color: Colors.white),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailScreen(
+                task: task,
+                onEditTask: (taskId, title) => _editTaskFromCallback(task, title),
+                onDeleteTask: _deleteTask,
+                onToggleCompletion: _toggleTaskStatus,
+              ),
+            ),
+          );
+          return false;
+        } else {
+          return await showDialog<bool>(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Delete Seva'),
+                content: Text('Are you sure you want to delete "${task.title}"?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          _deleteTask(task.id);
+        }
+      },
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: task.isOverdue && !task.isCompleted
+            ? const Icon(Icons.warning, color: Colors.red, size: 24)
+            : Icon(
+                task.customCategoryId != null
+                    ? Icons.label
+                    : _getCategoryIcon(task.category),
+                color: const Color(0xFF8B0000),
+                size: 24,
+              ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            decoration: task.isCompleted
+                ? TextDecoration.lineThrough
+                : TextDecoration.none,
+            color: task.isCompleted
+                ? Colors.grey
+                : (task.isOverdue ? Colors.red.shade700 : Colors.black),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            // Category
+            Row(
+              children: [
+                Icon(Icons.category, size: 11, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text(
+                  task.customCategoryId != null
+                      ? (_customCategoriesMap[task.customCategoryId]?.name ?? 'Unknown')
+                      : task.category.name,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            // Status
+            Row(
+              children: [
+                Icon(_getStatusIcon(task.status), size: 11, color: _getStatusColor(task.status)),
+                const SizedBox(width: 4),
+                Text(
+                  task.status.name,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _getStatusColor(task.status),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            // Due time
+            if (task.dueDate != null) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.schedule, size: 11, color: Color(0xFF8B0000)),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.dueDateDisplay,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF8B0000)),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailScreen(
+                task: task,
+                onEditTask: (taskId, title) => _editTaskFromCallback(task, title),
+                onDeleteTask: _deleteTask,
+                onToggleCompletion: _toggleTaskStatus,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _editTaskFromCallback(Task task, String newTitle) async {
+    final updatedTask = Task(
+      id: task.id,
+      title: newTitle,
+      description: task.description,
+      status: task.status,
+      createdAt: task.createdAt,
+      dueDate: task.dueDate,
+      category: task.category,
+      customCategoryId: task.customCategoryId,
+    );
+    _editTask(updatedTask);
+  }
+
+  void _editTask(Task task) async {
+    final repository = ref.read(taskRepositoryProvider);
+    final todoTask = TaskModelMapper.toTodoTask(task);
+
+    final result = await repository.updateTask(todoTask);
+
+    result.fold(
+      (failure) => _showErrorSnackBar('Failed to update seva: ${failure.toString()}'),
+      (updatedTask) {
+        final legacyTask = TaskModelMapper.fromTodoTask(updatedTask);
+        if (legacyTask.dueDate != null) {
+          NotificationService.scheduleTaskNotifications(legacyTask);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${updatedTask.title} updated')),
+          );
+        }
+      },
+    );
+  }
+
+  void _deleteTask(String taskId) async {
+    final repository = ref.read(taskRepositoryProvider);
+    final result = await repository.deleteTask(taskId);
+
+    result.fold(
+      (failure) => _showErrorSnackBar('Failed to delete seva: ${failure.toString()}'),
+      (_) async {
+        // Get the task to cancel its notifications
+        final taskResult = await repository.getTaskById(taskId);
+        await taskResult.fold(
+          (failure) async {},
+          (task) async {
+            final legacyTask = TaskModelMapper.fromTodoTask(task);
+            await NotificationService.cancelTaskNotifications(legacyTask);
+          },
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Seva deleted'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  void _toggleTaskStatus(String taskId) async {
+    final repository = ref.read(taskRepositoryProvider);
+    final currentTask = await repository.getTaskById(taskId);
+
+    await currentTask.fold(
+      (failure) async {
+        _showErrorSnackBar('Failed to get seva: ${failure.toString()}');
+      },
+      (task) async {
+        domain_status.TaskStatus newStatus;
+        switch (task.status) {
+          case domain_status.TaskStatus.pending:
+            newStatus = domain_status.TaskStatus.inProgress;
+            break;
+          case domain_status.TaskStatus.inProgress:
+            newStatus = domain_status.TaskStatus.completed;
+            break;
+          case domain_status.TaskStatus.completed:
+            newStatus = domain_status.TaskStatus.pending;
+            break;
+          default:
+            newStatus = domain_status.TaskStatus.pending;
+        }
+
+        final updatedTask = task.copyWith(
+          status: newStatus,
+          completedAt: newStatus == domain_status.TaskStatus.completed ? DateTime.now() : null,
+        );
+        final result = await repository.updateTask(updatedTask);
+
+        result.fold(
+          (failure) => _showErrorSnackBar('Failed to update seva: ${failure.toString()}'),
+          (_) async {
+            if (newStatus == domain_status.TaskStatus.completed) {
+              final taskResult = await repository.getTaskById(taskId);
+              await taskResult.fold(
+                (failure) async {},
+                (task) async {
+                  final legacyTask = TaskModelMapper.fromTodoTask(task);
+                  await NotificationService.cancelTaskNotifications(legacyTask);
+                },
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  IconData _getCategoryIcon(TaskCategory category) {
+    switch (category) {
+      case TaskCategory.transportation:
+        return Icons.directions_car;
+      case TaskCategory.food:
+        return Icons.restaurant;
+      case TaskCategory.bills:
+        return Icons.receipt_long;
+      case TaskCategory.bigExpenditure:
+        return Icons.attach_money;
+      case TaskCategory.medicines:
+        return Icons.medical_services;
+      case TaskCategory.centerSeva:
+        return Icons.home_repair_service;
+    }
+  }
+
+  IconData _getStatusIcon(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.assigned:
+        return Icons.assignment;
+      case TaskStatus.started:
+        return Icons.play_circle_outline;
+      case TaskStatus.completed:
+        return Icons.check_circle;
+    }
+  }
+
+  Color _getStatusColor(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.assigned:
+        return Colors.grey;
+      case TaskStatus.started:
+        return Colors.blue;
+      case TaskStatus.completed:
+        return Colors.green;
+    }
+  }
+}

@@ -21,9 +21,7 @@ dependencies:
   # Navigation
   go_router: ^14.2.0
 
-  # Database (Local)
-  drift: ^2.18.0
-  sqlite3_flutter_libs: ^0.5.21
+  # File System (kept for other features)
   path_provider: ^2.1.3
   path: ^1.9.0
 
@@ -38,7 +36,7 @@ dependencies:
   dio: ^5.4.3
   connectivity_plus: ^6.0.3
 
-  # Local Storage (keep for migration support)
+  # Local Storage
   shared_preferences: ^2.2.2
   flutter_secure_storage: ^9.2.1
 
@@ -58,7 +56,7 @@ dependencies:
   intl: ^0.20.2
   table_calendar: ^3.1.1
 
-  # Notifications (keep existing)
+  # Notifications
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
   permission_handler: ^11.3.1
@@ -86,7 +84,6 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   freezed: ^2.5.2
   json_serializable: ^6.8.0
-  drift_dev: ^2.18.0
 
   # Linting
   flutter_lints: ^3.0.0

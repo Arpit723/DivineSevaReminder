@@ -96,18 +96,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       isValid = false;
     }
 
-
-      // Validate due date (if set, it should be in the future for new tasks)
-    if (widget.isNewTask && widget.task.dueDate != null) {
-      final now = DateTime.now();
-      if (widget.task.dueDate!.isBefore(now)) {
-        setState(() {
-          _dueDateError = 'Due date must be in the future';
-        });
-        isValid = false;
-      }
-    }
-
     return isValid;
   }
 
@@ -151,11 +139,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _selectDueDate() async {
+    final now = DateTime.now();
+    // Normalize to midnight for consistent date comparison
+    final firstDate = DateTime(now.year, now.month, now.day);
+
+    // Get initial date, but ensure it's not before firstDate
+    DateTime initialDate = widget.task.dueDate ?? now;
+
+    // If the task's due date is in the past, use today as initial date
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    }
+
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: widget.task.dueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: firstDate.subtract(const Duration(days: 365)), // Allow past dates
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
 
     if (pickedDate != null) {
@@ -241,7 +241,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isNewTask 
-            ? 'Create New Seva'
+            ? 'Create Seva'
             : (_isEditing ? 'Edit Seva' : 'Seva Details')),
         actions: [
           if (widget.isNewTask) ...[
