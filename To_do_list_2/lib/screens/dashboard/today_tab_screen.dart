@@ -7,8 +7,16 @@ import '../../services/category_storage_service.dart';
 import '../../data/mappers/task_model_mapper.dart';
 import '../../domain/entities/task/todo_task.dart';
 import '../../domain/entities/task/task_status.dart' as domain_status;
+import '../../domain/entities/task/task_priority.dart';
+import '../../domain/entities/seva/seva_category.dart';
 import '../task_detail_screen.dart';
 import '../../presentation/providers/task_providers.dart';
+import '../../presentation/providers/task_filter_provider.dart';
+import '../../presentation/widgets/common/category_icon_widget.dart';
+import '../../presentation/widgets/task/task_search_bar.dart';
+import '../../presentation/widgets/task/task_filter_chips.dart';
+import '../../presentation/widgets/task/task_filter_dialog.dart' show showTaskFilterDialog;
+import '../../presentation/widgets/task/priority_indicator.dart';
 
 /// Today tab screen - shows all tasks due today
 class TodayTabScreen extends ConsumerStatefulWidget {
@@ -246,9 +254,28 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
     }
   }
 
+  /// Maps legacy TaskCategory to BuiltInCategory value for SevaCategory lookup
+  String? _mapTaskCategoryToId(TaskCategory category) {
+    switch (category) {
+      case TaskCategory.transportation:
+        return BuiltInCategory.transportation.value;
+      case TaskCategory.food:
+        return BuiltInCategory.food.value;
+      case TaskCategory.bills:
+        return BuiltInCategory.bills.value;
+      case TaskCategory.bigExpenditure:
+        return BuiltInCategory.bigExpenditure.value;
+      case TaskCategory.medicines:
+        return BuiltInCategory.medicines.value;
+      case TaskCategory.centerSeva:
+        return BuiltInCategory.centerSeva.value;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(tasksDueTodayProvider);
+    final filterState = ref.watch(taskFilterStateProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -282,6 +309,17 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
             ),
           ),
           const Divider(height: 1),
+
+          // Search bar
+          TaskSearchBar(
+            onFilterTap: () => showTaskFilterDialog(context),
+          ),
+
+          // Active filter chips
+          const TaskFilterChips(),
+
+          const Divider(height: 1),
+
           // Task list
           Expanded(
             child: tasksAsync.when(
@@ -301,40 +339,20 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
                 ),
               ),
               data: (todoTasks) {
-                final taskList = todoTasks
+                // Apply filter to tasks
+                final filteredTasks = filterState.applyTo(todoTasks);
+                final taskList = filteredTasks
                     .map((todoTask) => TaskModelMapper.fromTodoTask(todoTask))
                     .toList();
 
-                if (taskList.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.wb_sunny_outlined,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No sevas today',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Enjoy your day or add a new seva',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                // Empty state for no matching results
+                if (filterState.hasActiveFilters && taskList.isEmpty) {
+                  return _buildNoFilterResultsView();
+                }
+
+                // Original empty state (when no tasks today)
+                if (!filterState.hasActiveFilters && taskList.isEmpty) {
+                  return _buildNoTasksTodayView();
                 }
 
                 return ListView.builder(
@@ -417,15 +435,21 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
                       child: Card(
                         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         child: ListTile(
-                          leading: task.isOverdue && !task.isCompleted
-                              ? const Icon(Icons.warning, color: Colors.red, size: 24)
-                              : Icon(
-                                  task.customCategoryId != null
-                                      ? Icons.label
-                                      : _getCategoryIcon(task.category),
-                                  color: const Color(0xFF8B0000),
-                                  size: 24,
-                                ),
+                          leading: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (task.isOverdue && !task.isCompleted)
+                                const Icon(Icons.warning, color: Colors.red, size: 20)
+                              else
+                                PriorityIndicator(priority: task.priority, size: 20),
+                              const SizedBox(width: 4),
+                              CategoryIconConsumer(
+                                categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+                                customCategoryId: null,
+                                size: 20,
+                              ),
+                            ],
+                          ),
                           title: Text(
                             task.title,
                             style: TextStyle(
@@ -453,10 +477,9 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
                                     color: Colors.grey[600],
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    task.customCategoryId != null
-                                        ? (_customCategoriesMap[task.customCategoryId]?.name ?? 'Unknown')
-                                        : task.category.name,
+                                  CategoryNameConsumer(
+                                    categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+                                    customCategoryId: null,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey[600],
@@ -484,6 +507,28 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
                                   ),
                                 ],
                               ),
+                              // Priority (only show if not default)
+                              if (task.priority != TaskPriority.p3) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      task.priority.icon,
+                                      size: 12,
+                                      color: task.priority.color,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      task.priority.label,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: task.priority.color,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                               // Due time
                               if (task.dueDate != null) ...[
                                 const SizedBox(height: 2),
@@ -526,6 +571,70 @@ class _TodayTabScreenState extends ConsumerState<TodayTabScreen> {
                   },
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoFilterResultsView() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No matching tasks',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Try adjusting your filters',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoTasksTodayView() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.wb_sunny_outlined,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No sevas today',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Enjoy your day or add a new seva',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
             ),
           ),
         ],

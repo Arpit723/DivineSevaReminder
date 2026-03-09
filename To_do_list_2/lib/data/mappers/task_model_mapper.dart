@@ -1,5 +1,4 @@
 import '../../domain/entities/task/todo_task.dart';
-import '../../domain/entities/task/task_priority.dart';
 import '../../domain/entities/task/task_status.dart' as domain_status;
 import '../../models/task.dart' as legacy_model;
 
@@ -18,7 +17,7 @@ class TaskModelMapper {
       id: task.id,
       title: task.title,
       notes: task.description.isNotEmpty ? task.description : null,
-      priority: TaskPriority.p3, // Default priority
+      priority: task.priority, // Pass through priority directly (now uses domain TaskPriority)
       status: status,
       dueDate: task.dueDate,
       dueTime: task.dueDate, // Use dueDate as dueTime for legacy tasks
@@ -45,6 +44,7 @@ class TaskModelMapper {
       dueDate: todoTask.dueDate ?? todoTask.dueTime,
       category: _mapIdToCategory(todoTask.categoryId, todoTask.customCategoryId),
       customCategoryId: todoTask.customCategoryId,
+      priority: todoTask.priority, // Pass through priority directly
     );
   }
 

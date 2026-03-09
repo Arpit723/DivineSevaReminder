@@ -7,11 +7,15 @@ import '../../services/category_storage_service.dart';
 import '../../data/mappers/task_model_mapper.dart';
 import '../../domain/entities/task/todo_task.dart';
 import '../../domain/entities/task/task_status.dart' as domain_status;
+import '../../domain/entities/task/task_priority.dart';
+import '../../domain/entities/seva/seva_category.dart';
 import '../task_detail_screen.dart';
 import '../../presentation/providers/calendar_providers.dart';
 import '../../presentation/providers/task_providers.dart';
 import '../../presentation/widgets/calendar/month_calendar_widget.dart';
 import '../../presentation/widgets/calendar/date_utils.dart' as app_date_utils;
+import '../../presentation/widgets/common/category_icon_widget.dart';
+import '../../presentation/widgets/task/priority_indicator.dart';
 
 /// Upcoming tab screen - shows calendar and tasks grouped by date
 class UpcomingTabScreen extends ConsumerStatefulWidget {
@@ -338,15 +342,21 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: task.isOverdue && !task.isCompleted
-            ? const Icon(Icons.warning, color: Colors.red, size: 24)
-            : Icon(
-                task.customCategoryId != null
-                    ? Icons.label
-                    : _getCategoryIcon(task.category),
-                color: const Color(0xFF8B0000),
-                size: 24,
-              ),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (task.isOverdue && !task.isCompleted)
+              const Icon(Icons.warning, color: Colors.red, size: 20)
+            else
+              PriorityIndicator(priority: task.priority, size: 20),
+            const SizedBox(width: 4),
+            CategoryIconConsumer(
+              categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+              customCategoryId: null,
+              size: 20,
+            ),
+          ],
+        ),
         title: Text(
           task.title,
           style: TextStyle(
@@ -368,10 +378,9 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
               children: [
                 Icon(Icons.category, size: 11, color: Colors.grey[600]),
                 const SizedBox(width: 4),
-                Text(
-                  task.customCategoryId != null
-                      ? (_customCategoriesMap[task.customCategoryId]?.name ?? 'Unknown')
-                      : task.category.name,
+                CategoryNameConsumer(
+                  categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+                  customCategoryId: null,
                   style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                 ),
               ],
@@ -392,6 +401,28 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
                 ),
               ],
             ),
+            // Priority (only show if not default)
+            if (task.priority != TaskPriority.p3) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(
+                    task.priority.icon,
+                    size: 11,
+                    color: task.priority.color,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    task.priority.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: task.priority.color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             // Due time
             if (task.dueDate != null) ...[
               const SizedBox(height: 2),
@@ -585,6 +616,24 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
         return Colors.blue;
       case TaskStatus.completed:
         return Colors.green;
+    }
+  }
+
+  /// Maps legacy TaskCategory to BuiltInCategory value for SevaCategory lookup
+  String? _mapTaskCategoryToId(TaskCategory category) {
+    switch (category) {
+      case TaskCategory.transportation:
+        return BuiltInCategory.transportation.value;
+      case TaskCategory.food:
+        return BuiltInCategory.food.value;
+      case TaskCategory.bills:
+        return BuiltInCategory.bills.value;
+      case TaskCategory.bigExpenditure:
+        return BuiltInCategory.bigExpenditure.value;
+      case TaskCategory.medicines:
+        return BuiltInCategory.medicines.value;
+      case TaskCategory.centerSeva:
+        return BuiltInCategory.centerSeva.value;
     }
   }
 }

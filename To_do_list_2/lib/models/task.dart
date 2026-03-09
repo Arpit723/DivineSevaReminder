@@ -1,4 +1,7 @@
 
+import 'package:flutter/material.dart';
+import '../domain/entities/task/task_priority.dart';
+
 enum TaskCategory {
   transportation('Transportation'),
   food('Food'),
@@ -29,6 +32,7 @@ class Task {
   DateTime? dueDate; // Optional due date and time
   TaskCategory category; // Task category (built-in)
   String? customCategoryId; // Custom category ID (if using custom category)
+  TaskPriority priority; // Task priority (Urgent, High, Normal, Low)
 
   Task({
     required this.id,
@@ -39,6 +43,7 @@ class Task {
     this.dueDate,
     this.category = TaskCategory.transportation,
     this.customCategoryId,
+    this.priority = TaskPriority.p3, // Default to Normal
   });
 
   // Convert Task to JSON for storage
@@ -52,6 +57,7 @@ class Task {
       'dueDate': dueDate?.toIso8601String(),
       'category': category.name,
       'customCategoryId': customCategoryId,
+      'priority': priority.value, // Store priority as integer
     };
   }
 
@@ -66,6 +72,7 @@ class Task {
       dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
       category: _parseCategory(json['category']),
       customCategoryId: json['customCategoryId'],
+      priority: _parsePriority(json['priority']), // Parse priority from JSON
     );
   }
 
@@ -96,7 +103,7 @@ class Task {
   // Helper method to parse category from string
   static TaskCategory _parseCategory(String? categoryString) {
     if (categoryString == null) return TaskCategory.transportation;
-    
+
     switch (categoryString.toLowerCase()) {
       case 'transportation':
         return TaskCategory.transportation;
@@ -113,6 +120,15 @@ class Task {
       default:
         return TaskCategory.transportation;
     }
+  }
+
+  // Helper method to parse priority from integer
+  static TaskPriority _parsePriority(int? value) {
+    if (value == null) return TaskPriority.p3;
+    return TaskPriority.values.firstWhere(
+      (p) => p.value == value,
+      orElse: () => TaskPriority.p3,
+    );
   }
 
   // Helper method to check if task is overdue

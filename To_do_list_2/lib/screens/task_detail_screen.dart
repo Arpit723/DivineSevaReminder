@@ -4,6 +4,7 @@ import '../models/custom_category.dart';
 import '../services/notification_service.dart';
 import '../services/category_storage_service.dart';
 import 'category_list_screen.dart';
+import '../presentation/widgets/task/priority_selector.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -393,6 +394,39 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       tooltip: 'Change category',
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              //5. Priority Section
+              const Text(
+                'Priority',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B0000),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: PrioritySelector(
+                  selectedPriority: widget.task.priority,
+                  onPrioritySelected: (priority) {
+                    setState(() {
+                      widget.task.priority = priority;
+                    });
+
+                    // Auto-save the priority change
+                    if (!widget.isNewTask) {
+                      widget.onEditTask(widget.task.id, widget.task.title);
+                    }
+                  },
                 ),
               ),
               const SizedBox(height: 18),

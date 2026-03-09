@@ -8,6 +8,7 @@ import '../../screens/task_list_screen.dart';
 import '../../screens/task_detail_screen.dart';
 import '../../screens/category_list_screen.dart';
 import '../../screens/settings_screen.dart';
+import '../../screens/profile_screen.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/notification_permission_screen.dart';
 import '../../models/task.dart';
@@ -93,6 +94,15 @@ GoRouter goRouter(GoRouterRef ref) {
         pageBuilder: (context, state) => const MaterialPage(
           key: ValueKey('categories'),
           child: CategoryListScreen(),
+        ),
+      ),
+
+      // Profile
+      GoRoute(
+        path: '/profile',
+        pageBuilder: (context, state) => const MaterialPage(
+          key: ValueKey('profile'),
+          child: ProfileScreen(),
         ),
       ),
 

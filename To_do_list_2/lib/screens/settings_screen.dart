@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fpdart/fpdart.dart' hide State;
 import '../services/notification_service.dart';
 import '../presentation/providers/auth_providers.dart';
+import '../domain/entities/user/user.dart';
+import '../core/errors/failures.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -28,12 +31,15 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
   bool _notificationsEnabled = false;
   bool _isLoading = true;
   bool _isLoggingOut = false;
+  User? _currentUser;
+  bool _isLoadingUser = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkNotificationPermission();
+    _fetchCurrentUser();
   }
 
   @override
@@ -49,6 +55,37 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
     // When app comes back from background, refresh permission status
     if (state == AppLifecycleState.resumed) {
       _checkNotificationPermission();
+    }
+  }
+
+  Future<void> _fetchCurrentUser() async {
+    setState(() {
+      _isLoadingUser = true;
+    });
+
+    final authRepository = widget.ref.read(authRepositoryProvider);
+    final result = await authRepository.getCurrentUser();
+
+    if (mounted) {
+      result.fold(
+        (failure) {
+          setState(() {
+            _isLoadingUser = false;
+          });
+        },
+        (user) {
+          if (user != null) {
+            setState(() {
+              _currentUser = user;
+              _isLoadingUser = false;
+            });
+          } else {
+            setState(() {
+              _isLoadingUser = false;
+            });
+          }
+        },
+      );
     }
   }
 
@@ -331,6 +368,44 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
               ),
             ),
           ),
+
+          // Profile Cell
+          Container(
+            color: Colors.white,
+            child: ListTile(
+              leading: const Icon(
+                Icons.person_outline,
+                color: Color(0xFF8B0000),
+              ),
+              title: const Text('Profile'),
+              subtitle: Text(
+                _isLoadingUser
+                    ? 'Loading...'
+                    : (_currentUser?.fullName ?? 'View your profile'),
+                style: const TextStyle(
+                  fontSize: 12,
+                ),
+              ),
+              trailing: _isLoadingUser
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.chevron_right,
+                      color: Colors.grey,
+                    ),
+              onTap: () {
+                // Navigate to profile screen
+                context.push('/profile');
+              },
+            ),
+          ),
+
+          const Divider(height: 1),
 
           // Logout Button
           Container(
