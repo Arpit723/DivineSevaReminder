@@ -7,7 +7,6 @@ import '../../services/category_storage_service.dart';
 import '../../data/mappers/task_model_mapper.dart';
 import '../../domain/entities/task/todo_task.dart';
 import '../../domain/entities/task/task_status.dart' as domain_status;
-import '../../domain/entities/task/task_priority.dart';
 import '../../domain/entities/seva/seva_category.dart';
 import '../task_detail_screen.dart';
 import '../../presentation/providers/calendar_providers.dart';
@@ -15,7 +14,7 @@ import '../../presentation/providers/task_providers.dart';
 import '../../presentation/widgets/calendar/month_calendar_widget.dart';
 import '../../presentation/widgets/calendar/date_utils.dart' as app_date_utils;
 import '../../presentation/widgets/common/category_icon_widget.dart';
-import '../../presentation/widgets/task/priority_indicator.dart';
+import '../../presentation/widgets/task/task_completion_checkbox.dart';
 
 /// Upcoming tab screen - shows calendar and tasks grouped by date
 class UpcomingTabScreen extends ConsumerStatefulWidget {
@@ -105,7 +104,6 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedDate = ref.watch(calendarSelectedDateProvider);
-    final tasksAsync = ref.watch(tasksForDateProvider(selectedDate));
     final groupedTasksAsync = ref.watch(upcomingTasksGroupedProvider);
 
     return Scaffold(
@@ -342,20 +340,10 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (task.isOverdue && !task.isCompleted)
-              const Icon(Icons.warning, color: Colors.red, size: 20)
-            else
-              PriorityIndicator(priority: task.priority, size: 20),
-            const SizedBox(width: 4),
-            CategoryIconConsumer(
-              categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-              customCategoryId: null,
-              size: 20,
-            ),
-          ],
+        leading: CategoryIconConsumer(
+          categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+          customCategoryId: null,
+          size: 24,
         ),
         title: Text(
           task.title,
@@ -385,44 +373,6 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 2),
-            // Status
-            Row(
-              children: [
-                Icon(_getStatusIcon(task.status), size: 11, color: _getStatusColor(task.status)),
-                const SizedBox(width: 4),
-                Text(
-                  task.status.name,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _getStatusColor(task.status),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            // Priority (only show if not default)
-            if (task.priority != TaskPriority.p3) ...[
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(
-                    task.priority.icon,
-                    size: 11,
-                    color: task.priority.color,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    task.priority.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: task.priority.color,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
             // Due time
             if (task.dueDate != null) ...[
               const SizedBox(height: 2),
@@ -438,6 +388,10 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
               ),
             ],
           ],
+        ),
+        trailing: TaskCompletionCheckbox(
+          isCompleted: task.isCompleted,
+          onToggle: () => _toggleTaskStatus(task.id),
         ),
         onTap: () {
           Navigator.push(
@@ -577,45 +531,6 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
           backgroundColor: Colors.red,
         ),
       );
-    }
-  }
-
-  IconData _getCategoryIcon(TaskCategory category) {
-    switch (category) {
-      case TaskCategory.transportation:
-        return Icons.directions_car;
-      case TaskCategory.food:
-        return Icons.restaurant;
-      case TaskCategory.bills:
-        return Icons.receipt_long;
-      case TaskCategory.bigExpenditure:
-        return Icons.attach_money;
-      case TaskCategory.medicines:
-        return Icons.medical_services;
-      case TaskCategory.centerSeva:
-        return Icons.home_repair_service;
-    }
-  }
-
-  IconData _getStatusIcon(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.assigned:
-        return Icons.assignment;
-      case TaskStatus.started:
-        return Icons.play_circle_outline;
-      case TaskStatus.completed:
-        return Icons.check_circle;
-    }
-  }
-
-  Color _getStatusColor(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.assigned:
-        return Colors.grey;
-      case TaskStatus.started:
-        return Colors.blue;
-      case TaskStatus.completed:
-        return Colors.green;
     }
   }
 

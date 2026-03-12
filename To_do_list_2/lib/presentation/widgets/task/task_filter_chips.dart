@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../domain/entities/task/task_status.dart';
 import '../../providers/task_filter_provider.dart';
 
 /// Horizontal scrollable filter chips
@@ -28,27 +27,6 @@ class TaskFilterChips extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         children: [
-          // Status filter chip
-          if (filterState.status != null)
-            _FilterChip(
-              label: _getStatusLabel(filterState.status!),
-              onDeleted: () {
-                ref.read(taskFilterStateProvider.notifier).clearStatus();
-              },
-              icon: _getStatusIcon(filterState.status!),
-            ),
-
-          // Priority filter chip
-          if (filterState.priority != null)
-            _FilterChip(
-              label: filterState.priority!.label,
-              onDeleted: () {
-                ref.read(taskFilterStateProvider.notifier).clearPriority();
-              },
-              icon: filterState.priority!.icon,
-              iconColor: filterState.priority!.color,
-            ),
-
           // Category filter chips (if both built-in and custom)
           // Note: Only one can be active at a time
           if (filterState.categoryId != null || filterState.customCategoryId != null)
@@ -81,32 +59,6 @@ class TaskFilterChips extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _getStatusLabel(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.pending:
-        return 'Pending';
-      case TaskStatus.inProgress:
-        return 'In Progress';
-      case TaskStatus.completed:
-        return 'Completed';
-      case TaskStatus.archived:
-        return 'Archived';
-    }
-  }
-
-  IconData _getStatusIcon(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.pending:
-        return Icons.pending;
-      case TaskStatus.inProgress:
-        return Icons.play_circle_outline;
-      case TaskStatus.completed:
-        return Icons.check_circle;
-      case TaskStatus.archived:
-        return Icons.archive;
-    }
   }
 }
 

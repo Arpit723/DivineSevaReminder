@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 
 import 'task_priority.dart';
 import 'task_status.dart';
-import '../seva/seva_category.dart';
 
 part 'todo_task.freezed.dart';
 part 'todo_task.g.dart';

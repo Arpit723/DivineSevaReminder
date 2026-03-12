@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'settings_screen.dart';
-import 'dashboard/today_tab_screen.dart';
 import 'dashboard/upcoming_tab_screen.dart';
-import 'dashboard/all_tasks_tab_screen.dart';
-import 'dashboard/completed_tasks_tab_screen.dart';
+import 'dashboard/task_list_content_screen.dart';
+import '../models/task_list_type.dart';
 import '../presentation/providers/sidebar_provider.dart';
 import '../presentation/providers/task_filter_provider.dart';
 import '../presentation/widgets/navigation/sidebar_navigation.dart';
@@ -132,11 +131,11 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
       case SidebarItem.upcoming:
         return const UpcomingTabScreen();
       case SidebarItem.today:
-        return const TodayTabScreen();
+        return const TaskListContentScreen(type: TaskListType.today);
       case SidebarItem.all:
-        return const AllTasksTabScreen();
+        return const TaskListContentScreen(type: TaskListType.all);
       case SidebarItem.completed:
-        return const CompletedTasksTabScreen();
+        return const TaskListContentScreen(type: TaskListType.completed);
     }
   }
 }

@@ -1,7 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../domain/entities/task/task_filter.dart';
-import '../../domain/entities/task/task_status.dart';
-import '../../domain/entities/task/task_priority.dart';
 
 part 'task_filter_provider.g.dart';
 
@@ -16,16 +14,6 @@ class TaskFilterState extends _$TaskFilterState {
   /// Update search query
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
-  }
-
-  /// Set status filter
-  void setStatusFilter(TaskStatus? status) {
-    state = state.copyWith(status: () => status);
-  }
-
-  /// Set priority filter
-  void setPriorityFilter(TaskPriority? priority) {
-    state = state.copyWith(priority: () => priority);
   }
 
   /// Set category filter
@@ -58,14 +46,6 @@ class TaskFilterState extends _$TaskFilterState {
   /// Clear specific filter types
   void clearSearch() {
     state = state.copyWith(searchQuery: '');
-  }
-
-  void clearStatus() {
-    state = state.copyWith(status: () => null);
-  }
-
-  void clearPriority() {
-    state = state.copyWith(priority: () => null);
   }
 
   void clearCategory() {

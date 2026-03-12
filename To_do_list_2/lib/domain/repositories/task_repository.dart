@@ -1,6 +1,5 @@
 import 'package:fpdart/fpdart.dart';
 import '../entities/task/todo_task.dart';
-import '../entities/task/task_priority.dart';
 import '../entities/task/task_status.dart';
 import '../core/errors/failures.dart';
 

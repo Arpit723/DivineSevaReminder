@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/task.dart';
-import '../../models/custom_category.dart';
+import '../../models/task_list_type.dart';
 import '../../services/notification_service.dart';
-import '../../services/category_storage_service.dart';
 import '../../data/mappers/task_model_mapper.dart';
-import '../../domain/entities/task/todo_task.dart';
 import '../../domain/entities/task/task_status.dart' as domain_status;
-import '../../domain/entities/task/task_priority.dart';
 import '../../domain/entities/seva/seva_category.dart';
 import '../task_detail_screen.dart';
 import '../../presentation/providers/task_providers.dart';
@@ -16,34 +13,20 @@ import '../../presentation/widgets/common/category_icon_widget.dart';
 import '../../presentation/widgets/task/task_search_bar.dart';
 import '../../presentation/widgets/task/task_filter_chips.dart';
 import '../../presentation/widgets/task/task_filter_dialog.dart' show showTaskFilterDialog;
-import '../../presentation/widgets/task/priority_indicator.dart';
+import '../../presentation/widgets/task/task_completion_checkbox.dart';
 
-/// All Tasks tab screen - shows all tasks regardless of status or due date
-class AllTasksTabScreen extends ConsumerStatefulWidget {
-  const AllTasksTabScreen({super.key});
+/// Unified task list content screen - adapts based on TaskListType
+class TaskListContentScreen extends ConsumerStatefulWidget {
+  final TaskListType type;
+
+  const TaskListContentScreen({super.key, required this.type});
 
   @override
-  ConsumerState<AllTasksTabScreen> createState() => _AllTasksTabScreenState();
+  ConsumerState<TaskListContentScreen> createState() =>
+      _TaskListContentScreenState();
 }
 
-class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
-  Map<String, CustomCategory> _customCategoriesMap = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCustomCategories();
-  }
-
-  Future<void> _loadCustomCategories() async {
-    final categories = await CategoryStorageService.getAllCategories();
-    if (mounted) {
-      setState(() {
-        _customCategoriesMap = {for (var cat in categories) cat.id: cat};
-      });
-    }
-  }
-
+class _TaskListContentScreenState extends ConsumerState<TaskListContentScreen> {
   void _navigateToNewTask() {
     final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -215,45 +198,6 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
     );
   }
 
-  IconData _getCategoryIcon(TaskCategory category) {
-    switch (category) {
-      case TaskCategory.transportation:
-        return Icons.directions_car;
-      case TaskCategory.food:
-        return Icons.restaurant;
-      case TaskCategory.bills:
-        return Icons.receipt_long;
-      case TaskCategory.bigExpenditure:
-        return Icons.attach_money;
-      case TaskCategory.medicines:
-        return Icons.medical_services;
-      case TaskCategory.centerSeva:
-        return Icons.home_repair_service;
-    }
-  }
-
-  IconData _getStatusIcon(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.assigned:
-        return Icons.assignment;
-      case TaskStatus.started:
-        return Icons.play_circle_outline;
-      case TaskStatus.completed:
-        return Icons.check_circle;
-    }
-  }
-
-  Color _getStatusColor(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.assigned:
-        return Colors.grey;
-      case TaskStatus.started:
-        return Colors.blue;
-      case TaskStatus.completed:
-        return Colors.green;
-    }
-  }
-
   /// Maps legacy TaskCategory to BuiltInCategory value for SevaCategory lookup
   String? _mapTaskCategoryToId(TaskCategory category) {
     switch (category) {
@@ -274,8 +218,15 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tasksAsync = ref.watch(taskListProvider);
+    final config = TaskListConfig.forType(widget.type);
     final filterState = ref.watch(taskFilterStateProvider);
+
+    // Select the appropriate provider based on type
+    final tasksAsync = switch (widget.type) {
+      TaskListType.today => ref.watch(tasksDueTodayProvider),
+      TaskListType.all => ref.watch(taskListProvider),
+      TaskListType.completed => ref.watch(completedTasksProvider),
+    };
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -286,30 +237,6 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
       ),
       body: Column(
         children: [
-          // Header with "All Sevas" title
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.list,
-                  color: const Color(0xFF8B0000),
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'All Sevas',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8B0000),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
           // Search bar
           TaskSearchBar(
             onFilterTap: () => showTaskFilterDialog(context),
@@ -350,9 +277,9 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
                   return _buildNoFilterResultsView();
                 }
 
-                // Original empty state (when no tasks at all)
+                // Original empty state (when no tasks)
                 if (!filterState.hasActiveFilters && taskList.isEmpty) {
-                  return _buildNoTasksView();
+                  return _buildEmptyView(config);
                 }
 
                 return ListView.builder(
@@ -435,20 +362,10 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
                       child: Card(
                         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         child: ListTile(
-                          leading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (task.isOverdue && !task.isCompleted)
-                                const Icon(Icons.warning, color: Colors.red, size: 20)
-                              else
-                                PriorityIndicator(priority: task.priority, size: 20),
-                              const SizedBox(width: 4),
-                              CategoryIconConsumer(
-                                categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-                                customCategoryId: null,
-                                size: 20,
-                              ),
-                            ],
+                          leading: CategoryIconConsumer(
+                            categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
+                            customCategoryId: null,
+                            size: 24,
                           ),
                           title: Text(
                             task.title,
@@ -487,48 +404,6 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
-                              // Status
-                              Row(
-                                children: [
-                                  Icon(
-                                    _getStatusIcon(task.status),
-                                    size: 12,
-                                    color: _getStatusColor(task.status),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    task.status.name,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _getStatusColor(task.status),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Priority (only show if not default)
-                              if (task.priority != TaskPriority.p3) ...[
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      task.priority.icon,
-                                      size: 12,
-                                      color: task.priority.color,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      task.priority.label,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: task.priority.color,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
                               // Due time
                               if (task.dueDate != null) ...[
                                 const SizedBox(height: 2),
@@ -550,7 +425,33 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
                                   ],
                                 ),
                               ],
+                              // Completion indicator (only for completed tasks)
+                              if (config.showCompletedIndicator) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 12,
+                                      color: Colors.green,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Completed',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
+                          ),
+                          trailing: TaskCompletionCheckbox(
+                            isCompleted: task.isCompleted,
+                            onToggle: () => _toggleTaskStatus(task.id),
                           ),
                           onTap: () {
                             Navigator.push(
@@ -610,29 +511,29 @@ class _AllTasksTabScreenState extends ConsumerState<AllTasksTabScreen> {
     );
   }
 
-  Widget _buildNoTasksView() {
-    return const Center(
+  Widget _buildEmptyView(TaskListConfig config) {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.list,
+            config.emptyIcon,
             size: 64,
             color: Colors.grey,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'No sevas yet',
-            style: TextStyle(
+            config.emptyTitle,
+            style: const TextStyle(
               fontSize: 18,
               color: Colors.grey,
               fontWeight: FontWeight.w500,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            'Create your first seva to get started',
-            style: TextStyle(
+            config.emptySubtitle,
+            style: const TextStyle(
               fontSize: 14,
               color: Colors.grey,
             ),

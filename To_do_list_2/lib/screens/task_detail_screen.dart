@@ -4,7 +4,6 @@ import '../models/custom_category.dart';
 import '../services/notification_service.dart';
 import '../services/category_storage_service.dart';
 import 'category_list_screen.dart';
-import '../presentation/widgets/task/priority_selector.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -132,11 +131,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         const SnackBar(content: Text('Task updated successfully!')),
       );
     }
-  }
-
-  void _saveStatusChange() {
-    // Just trigger the save mechanism to persist the status change
-    widget.onEditTask(widget.task.id, widget.task.title);
   }
 
   Future<void> _selectDueDate() async {
@@ -398,39 +392,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
               const SizedBox(height: 18),
 
-              //5. Priority Section
-              const Text(
-                'Priority',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B0000),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: PrioritySelector(
-                  selectedPriority: widget.task.priority,
-                  onPrioritySelected: (priority) {
-                    setState(() {
-                      widget.task.priority = priority;
-                    });
-
-                    // Auto-save the priority change
-                    if (!widget.isNewTask) {
-                      widget.onEditTask(widget.task.id, widget.task.title);
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(height: 18),
-
               //3.  Due Date Section
               const Text(
                 'Due Date',
@@ -510,66 +471,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-
-              //4. Task Status Section
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Status',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8B0000),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...TaskStatus.values.map((status) {
-                      final isSelected = widget.task.status == status;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: GestureDetector(
-                          onTap: () {
-                            if (widget.task.status != status) {
-                              setState(() {
-                                widget.task.status = status;
-                              });
-                              _saveStatusChange();
-                            }
-                          },
-                          child: Row(
-                            children: [
-                              Icon(
-                                isSelected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                color: isSelected ? const Color(0xFF8B0000) : Colors.grey,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                status.name,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? const Color(0xFF8B0000) : Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 18),
             // Created Date
             _buildDetailRow(
               icon: Icons.schedule,

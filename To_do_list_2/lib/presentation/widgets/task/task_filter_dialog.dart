@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../domain/entities/task/task_priority.dart';
-import '../../../domain/entities/task/task_status.dart';
 import '../../providers/task_filter_provider.dart';
 import '../../providers/category_provider.dart';
 
@@ -75,40 +73,6 @@ class _TaskFilterDialogState extends ConsumerState<TaskFilterDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Status filter
-                    const _FilterSectionTitle(
-                      title: 'Status',
-                      icon: Icons.pending_actions,
-                    ),
-                    const SizedBox(height: 8),
-                    _StatusFilterChips(
-                      selectedStatus: filterState.status,
-                      onStatusSelected: (status) {
-                        ref
-                            .read(taskFilterStateProvider.notifier)
-                            .setStatusFilter(status);
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Priority filter
-                    const _FilterSectionTitle(
-                      title: 'Priority',
-                      icon: Icons.flag,
-                    ),
-                    const SizedBox(height: 8),
-                    _PriorityFilterChips(
-                      selectedPriority: filterState.priority,
-                      onPrioritySelected: (priority) {
-                        ref
-                            .read(taskFilterStateProvider.notifier)
-                            .setPriorityFilter(priority);
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
                     // Category filter
                     const _FilterSectionTitle(
                       title: 'Category',
@@ -191,68 +155,6 @@ class _FilterSectionTitle extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _StatusFilterChips extends StatelessWidget {
-  final TaskStatus? selectedStatus;
-  final Function(TaskStatus?) onStatusSelected;
-
-  const _StatusFilterChips({
-    required this.selectedStatus,
-    required this.onStatusSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _FilterChoiceChip(
-          label: 'All',
-          isSelected: selectedStatus == null,
-          onSelected: () => onStatusSelected(null),
-        ),
-        ...TaskStatus.values.map((status) => _FilterChoiceChip(
-              label: status.label,
-              isSelected: selectedStatus == status,
-              onSelected: () => onStatusSelected(status),
-            )),
-      ],
-    );
-  }
-}
-
-class _PriorityFilterChips extends StatelessWidget {
-  final TaskPriority? selectedPriority;
-  final Function(TaskPriority?) onPrioritySelected;
-
-  const _PriorityFilterChips({
-    required this.selectedPriority,
-    required this.onPrioritySelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _FilterChoiceChip(
-          label: 'All',
-          isSelected: selectedPriority == null,
-          onSelected: () => onPrioritySelected(null),
-        ),
-        ...TaskPriority.values.map((priority) => _FilterChoiceChip(
-              label: priority.label,
-              isSelected: selectedPriority == priority,
-              onSelected: () => onPrioritySelected(priority),
-              icon: priority.icon,
-              iconColor: priority.color,
-            )),
       ],
     );
   }
