@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fpdart/fpdart.dart' hide State;
 import '../services/notification_service.dart';
 import '../presentation/providers/auth_providers.dart';
+import '../presentation/providers/theme_provider.dart';
 import '../domain/entities/user/user.dart';
 import '../core/errors/failures.dart';
 
@@ -255,35 +256,109 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = widget.ref.watch(themeControllerProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF8B0000),
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        foregroundColor: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
         elevation: 2,
       ),
       body: ListView(
         children: [
+          // Appearance Section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Appearance',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
+              ),
+            ),
+          ),
+
+          // Theme Mode Selector
+          Container(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            child: Column(
+              children: [
+                _ThemeOptionTile(
+                  icon: Icons.light_mode,
+                  title: 'Light Mode',
+                  subtitle: 'Always use light theme',
+                  value: ThemeModeOption.light,
+                  groupValue: themeMode,
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.ref.read(themeControllerProvider.notifier).setTheme(value);
+                    }
+                  },
+                ),
+                Divider(
+                  height: 1,
+                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                  indent: 16,
+                ),
+                _ThemeOptionTile(
+                  icon: Icons.dark_mode,
+                  title: 'Dark Mode',
+                  subtitle: 'Always use dark theme',
+                  value: ThemeModeOption.dark,
+                  groupValue: themeMode,
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.ref.read(themeControllerProvider.notifier).setTheme(value);
+                    }
+                  },
+                ),
+                Divider(
+                  height: 1,
+                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                  indent: 16,
+                ),
+                _ThemeOptionTile(
+                  icon: Icons.brightness_auto,
+                  title: 'System Default',
+                  subtitle: 'Match your device theme',
+                  value: ThemeModeOption.system,
+                  groupValue: themeMode,
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.ref.read(themeControllerProvider.notifier).setTheme(value);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
           // Notifications Section
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Text(
               'Notifications',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
               ),
             ),
           ),
 
           // Notification Permission Toggle
           Container(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.notifications,
-                color: Color(0xFF8B0000),
+                color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
               ),
               title: const Text('Notification Permission'),
               subtitle: Text(
@@ -306,76 +381,82 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
                   : Switch(
                       value: _notificationsEnabled,
                       onChanged: _toggleNotifications,
-                      activeColor: const Color(0xFF8B0000),
+                      activeColor: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
                     ),
             ),
           ),
 
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+          ),
 
           // App Info Section
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Text(
               'About',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
               ),
             ),
           ),
 
           // App Version
           Container(
-            color: Colors.white,
-            child: const ListTile(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            child: ListTile(
               leading: Icon(
                 Icons.info_outline,
-                color: Color(0xFF8B0000),
+                color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
               ),
-              title: Text('App Version'),
-              subtitle: Text('1.0.0'),
+              title: const Text('App Version'),
+              subtitle: const Text('1.0.0'),
             ),
           ),
 
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+          ),
 
           // App Name
           Container(
-            color: Colors.white,
-            child: const ListTile(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            child: ListTile(
               leading: Icon(
                 Icons.apps,
-                color: Color(0xFF8B0000),
+                color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
               ),
-              title: Text('Divine To-Do List'),
-              subtitle: Text('Manage your sevas and tasks'),
+              title: const Text('Divine To-Do List'),
+              subtitle: const Text('Manage your sevas and tasks'),
             ),
           ),
 
           const SizedBox(height: 24),
 
           // Account Section
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Text(
               'Account',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
               ),
             ),
           ),
 
           // Profile Cell
           Container(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.person_outline,
-                color: Color(0xFF8B0000),
+                color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
               ),
               title: const Text('Profile'),
               subtitle: Text(
@@ -394,9 +475,9 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
                         strokeWidth: 2,
                       ),
                     )
-                  : const Icon(
+                  : Icon(
                       Icons.chevron_right,
-                      color: Colors.grey,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey,
                     ),
               onTap: () {
                 // Navigate to profile screen
@@ -405,20 +486,23 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
             ),
           ),
 
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+          ),
 
           // Logout Button
           Container(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.logout,
-                color: Color(0xFF8B0000),
+                color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
               ),
-              title: const Text(
+              title: Text(
                 'Logout',
                 style: TextStyle(
-                  color: Color(0xFF8B0000),
+                  color: isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -427,6 +511,67 @@ class _SettingsScreenState extends State<_SettingsScreenContent> with WidgetsBin
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Widget for theme option radio tile
+class _ThemeOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final ThemeModeOption value;
+  final ThemeModeOption groupValue;
+  final ValueChanged<ThemeModeOption?> onChanged;
+
+  const _ThemeOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = value == groupValue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? const Color(0xFFA52A2A) : const Color(0xFF8B0000);
+
+    return RadioListTile<ThemeModeOption>(
+      value: value,
+      groupValue: groupValue,
+      onChanged: onChanged,
+      activeColor: primaryColor,
+      title: Row(
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? primaryColor : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(left: 32),
+        child: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }

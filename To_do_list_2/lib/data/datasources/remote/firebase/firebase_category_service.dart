@@ -149,10 +149,9 @@ class FirebaseCategoryService {
 
     return categoriesCollection
         .where('type', isEqualTo: 'custom')
-        .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final categories = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return SevaCategory.custom(
           id: doc.id,
@@ -164,6 +163,21 @@ class FirebaseCategoryService {
               : DateTime.now(),
         );
       }).toList();
+
+      // Sort client-side by createdAt (ascending)
+      categories.sort((a, b) {
+        final aDate = a.maybeWhen(
+          custom: (id, name, iconName, colorValue, createdAt) => createdAt,
+          orElse: () => DateTime.now(),
+        ) ?? DateTime.now();
+        final bDate = b.maybeWhen(
+          custom: (id, name, iconName, colorValue, createdAt) => createdAt,
+          orElse: () => DateTime.now(),
+        ) ?? DateTime.now();
+        return aDate.compareTo(bDate);
+      });
+
+      return categories;
     });
   }
 

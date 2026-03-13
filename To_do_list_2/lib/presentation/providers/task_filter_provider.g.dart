@@ -6,7 +6,7 @@ part of 'task_filter_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$taskFilterStateHash() => r'ba5ca8c01788b4ffd09487cdc97ebcced91b2810';
+String _$taskFilterStateHash() => r'539c60460f14fd3b7c65112b456584329cd8cd79';
 
 /// Provider for managing task filter state
 ///

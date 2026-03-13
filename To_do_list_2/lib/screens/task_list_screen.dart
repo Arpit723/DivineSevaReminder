@@ -6,6 +6,7 @@ import 'dashboard/task_list_content_screen.dart';
 import '../models/task_list_type.dart';
 import '../presentation/providers/sidebar_provider.dart';
 import '../presentation/providers/task_filter_provider.dart';
+import '../presentation/providers/migration_provider.dart';
 import '../presentation/widgets/navigation/sidebar_navigation.dart';
 import '../presentation/widgets/navigation/mobile_drawer.dart';
 
@@ -17,6 +18,23 @@ class TodoListScreen extends ConsumerStatefulWidget {
 }
 
 class _TodoListScreenState extends ConsumerState<TodoListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger category migration after first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndRunMigration();
+    });
+  }
+
+  Future<void> _checkAndRunMigration() async {
+    final needsMigration = await ref.read(needsMigrationProvider.future);
+    if (needsMigration) {
+      final controller = ref.read(categoryMigrationProvider.notifier);
+      await controller.startMigration();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedItem = ref.watch(sidebarSelectionProvider);

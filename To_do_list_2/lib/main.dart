@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'services/notification_service.dart';
 import 'presentation/navigation/app_router.dart';
+import 'presentation/theme/app_theme.dart';
+import 'presentation/providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +25,8 @@ void main() async {
   await NotificationService.initialize();
 
   runApp(
-    const ProviderScope(
-      child: TodoApp(),
+    ProviderScope(
+      child: TodoApp(key: UniqueKey()),
     ),
   );
 }
@@ -41,6 +43,10 @@ class _TodoAppState extends ConsumerState<TodoApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Initialize theme from persistent storage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(themeControllerProvider.notifier).initialize();
+    });
   }
 
   @override
@@ -96,36 +102,14 @@ class _TodoAppState extends ConsumerState<TodoApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Divine To Do List',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.red,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF8B0000), // Dark red
-          primary: const Color(0xFF8B0000), // Dark red
-          onPrimary: Colors.white,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF8B0000), // Dark red text
-          elevation: 2,
-          shadowColor: Colors.grey,
-        ),
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-          headlineMedium: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-          headlineSmall: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-          titleLarge: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-          titleMedium: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-          titleSmall: TextStyle(color: Color(0xFF8B0000), fontWeight: FontWeight.bold),
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xFF8B0000),
-          foregroundColor: Colors.white,
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
