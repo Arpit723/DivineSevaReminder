@@ -58,11 +58,11 @@ class TaskModelMapper {
       case legacy_model.TaskCategory.bills:
         return 'bills';
       case legacy_model.TaskCategory.bigExpenditure:
-        return 'big_expenditure';
+        return 'bigExpenditure';
       case legacy_model.TaskCategory.medicines:
         return 'medicines';
       case legacy_model.TaskCategory.centerSeva:
-        return 'center_seva';
+        return 'centerSeva';
     }
   }
 
@@ -80,11 +80,11 @@ class TaskModelMapper {
         return legacy_model.TaskCategory.food;
       case 'bills':
         return legacy_model.TaskCategory.bills;
-      case 'big_expenditure':
+      case 'bigExpenditure':
         return legacy_model.TaskCategory.bigExpenditure;
       case 'medicines':
         return legacy_model.TaskCategory.medicines;
-      case 'center_seva':
+      case 'centerSeva':
         return legacy_model.TaskCategory.centerSeva;
       default:
         return legacy_model.TaskCategory.transportation;

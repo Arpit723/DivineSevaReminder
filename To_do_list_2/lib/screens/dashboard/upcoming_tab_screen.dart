@@ -341,8 +341,8 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CategoryIconConsumer(
-          categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-          customCategoryId: null,
+          categoryId: task.customCategoryId != null ? null : _mapTaskCategoryToId(task.category),
+          customCategoryId: task.customCategoryId,
           size: 24,
         ),
         title: Text(
@@ -367,8 +367,8 @@ class _UpcomingTabScreenState extends ConsumerState<UpcomingTabScreen> {
                 Icon(Icons.category, size: 11, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 CategoryNameConsumer(
-                  categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-                  customCategoryId: null,
+                  categoryId: task.customCategoryId != null ? null : _mapTaskCategoryToId(task.category),
+                  customCategoryId: task.customCategoryId,
                   style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                 ),
               ],

@@ -363,8 +363,8 @@ class _TaskListContentScreenState extends ConsumerState<TaskListContentScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         child: ListTile(
                           leading: CategoryIconConsumer(
-                            categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-                            customCategoryId: null,
+                            categoryId: task.customCategoryId != null ? null : _mapTaskCategoryToId(task.category),
+                            customCategoryId: task.customCategoryId,
                             size: 24,
                           ),
                           title: Text(
@@ -395,8 +395,8 @@ class _TaskListContentScreenState extends ConsumerState<TaskListContentScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   CategoryNameConsumer(
-                                    categoryId: task.customCategoryId ?? _mapTaskCategoryToId(task.category),
-                                    customCategoryId: null,
+                                    categoryId: task.customCategoryId != null ? null : _mapTaskCategoryToId(task.category),
+                                    customCategoryId: task.customCategoryId,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey[600],
